@@ -538,6 +538,46 @@
                     "type": "string",
                     "description": "Channel name(s) to use for cellpose segmentation. If multiple, separate by space, comma or pipe characters."
                 },
+                "use_cellpose_channel_combination": {
+                    "type": "boolean",
+                    "description": "Whether to combine nuclear and membrane channels before cellpose segmentation",
+                    "default": false
+                },
+                "cellpose_nuclear_channels": {
+                    "type": "string",
+                    "description": "Nuclear channel name(s) to combine. If multiple, separate by space, comma or pipe characters."
+                },
+                "cellpose_membrane_channels": {
+                    "type": "string",
+                    "description": "Membrane channel name(s) to combine. If multiple, separate by space, comma or pipe characters."
+                },
+                "cellpose_nuclear_method": {
+                    "type": "string",
+                    "description": "Method used to combine nuclear channels",
+                    "enum": [
+                        "max",
+                        "prod"
+                    ],
+                    "default": "max"
+                },
+                "cellpose_membrane_method": {
+                    "type": "string",
+                    "description": "Method used to combine membrane channels",
+                    "enum": [
+                        "max",
+                        "prod"
+                    ],
+                    "default": "max"
+                },
+                "cellpose_combined_image_key": {
+                    "type": "string",
+                    "description": "Image key to add for combined segmentation channels",
+                    "default": "segmentation_channels"
+                },
+                "cellpose_combination_image_key": {
+                    "type": "string",
+                    "description": "Optional source image key used before combining channels"
+                },
                 "flow_threshold": {
                     "type": "number",
                     "description": "Cellpose `flow_threshold` parameter"

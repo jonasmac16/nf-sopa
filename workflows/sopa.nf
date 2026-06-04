@@ -10,6 +10,7 @@ include { methodsDescriptionText  } from '../subworkflows/local/utils_nfcore_sop
 include { TO_SPATIALDATA          } from '../modules/local/to_spatialdata'
 include { MAKE_IMAGE_PATCHES      } from '../modules/local/make_image_patches'
 include { MAKE_TRANSCRIPT_PATCHES } from '../modules/local/make_transcript_patches'
+include { COMBINE_SEGMENTATION_CHANNELS } from '../modules/local/combine_segmentation_channels'
 include { TISSUE_SEGMENTATION     } from '../modules/local/tissue_segmentation'
 include { AGGREGATE               } from '../modules/local/aggregate'
 include { EXPLORER                } from '../modules/local/explorer'
@@ -69,7 +70,13 @@ workflow SOPA {
     }
 
     if (params.use_cellpose) {
-        ch_image_patches = MAKE_IMAGE_PATCHES(ch_tissue_seg, argsCLI("image_patches"))
+        ch_cellpose_patches = ch_tissue_seg
+
+        if (params.use_cellpose_channel_combination) {
+            ch_cellpose_patches = COMBINE_SEGMENTATION_CHANNELS(ch_tissue_seg, argsCLI("cellpose_channel_combination"))
+        }
+
+        ch_image_patches = MAKE_IMAGE_PATCHES(ch_cellpose_patches, argsCLI("image_patches"))
         (ch_resolved, versions) = CELLPOSE(ch_image_patches)
 
         ch_versions = ch_versions.mix(versions)

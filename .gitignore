@@ -11,3 +11,5 @@ sandbox
 samplesheets
 lint_*
 .nf-test*
+.mamba/
+.apptainer/

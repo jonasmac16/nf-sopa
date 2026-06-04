@@ -55,6 +55,16 @@ def extractSubArgs(Map args, String group) {
             gaussian_sigma: args.gaussian_sigma,
             method_kwargs: args.cellpose_kwargs,
         ]
+    } else if (group == "cellpose_channel_combination") {
+        return [
+            nuclear_channel: getChannels(args.cellpose_nuclear_channels, false),
+            membrane_channel: getChannels(args.cellpose_membrane_channels, false),
+            nuclear_method: args.cellpose_nuclear_method,
+            membrane_method: args.cellpose_membrane_method,
+            image_key: args.cellpose_combination_image_key,
+            key_added: args.cellpose_combined_image_key,
+            set_as_segmentation_image: true,
+        ]
     } else if (group == "stardist") {
         return [
             model_type: args.stardist_model_type,

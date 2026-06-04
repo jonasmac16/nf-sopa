@@ -1,0 +1,20 @@
+nextflow_pipeline {
+
+    name "Test pipeline"
+    script "../main.nf"
+    profile "test_cellpose_CK_DAPI_multi_membrane"
+    tag "pipeline"
+
+    test("-profile test_cellpose_CK_DAPI_multi_membrane") {
+
+        when {
+            params {
+                outdir = "$outputDir"
+            }
+        }
+
+        then {
+            assert workflow.success
+        }
+    }
+}

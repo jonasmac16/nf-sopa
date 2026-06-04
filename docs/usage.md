@@ -127,6 +127,35 @@ You'll also need to choose some Sopa parameters to decide which reader/segmentat
 
 These profiles contain the backbone of the pipeline, i.e. which technology to use and how to process the segmentation. For more customization, you can provide [other Sopa parameters](https://nf-co.re/sopa/dev/parameters/) via the command line, for instance `--use_scanpy_preprocessing true` if you want to have a UMAP and a Leiden clustering on your output AnnData object.
 
+### Optional pre-Cellpose channel combination
+
+When running Cellpose, you can optionally combine multiple nuclear channels into one `nuclear` channel and multiple membrane channels into one `membrane` channel before image patchification. This step is disabled by default and only runs when `--use_cellpose_channel_combination true` is set.
+
+Relevant parameters:
+
+- `--use_cellpose_channel_combination` Enable or disable the preprocessing step (default: `false`)
+- `--cellpose_nuclear_channels` Nuclear channel names (space/comma/pipe separated)
+- `--cellpose_membrane_channels` Membrane channel names (space/comma/pipe separated)
+- `--cellpose_nuclear_method` Combination method for nuclear channels (`max` or `prod`, default: `max`)
+- `--cellpose_membrane_method` Combination method for membrane channels (`max` or `prod`, default: `max`)
+- `--cellpose_combined_image_key` Output image key added to `sdata.images` (default: `segmentation_channels`)
+- `--cellpose_combination_image_key` Optional source image key to read from
+
+Example:
+
+```bash
+nextflow run nf-core/sopa \
+  --input ./samplesheet.csv \
+  --outdir ./results \
+  -profile docker,test_cellpose_CK_DAPI \
+  --use_cellpose_channel_combination true \
+  --cellpose_nuclear_channels "DAPI" \
+  --cellpose_membrane_channels "CK" \
+  --cellpose_nuclear_method max \
+  --cellpose_membrane_method max \
+  --cellpose_channels "nuclear membrane"
+```
+
 ## Running the pipeline
 
 Once you have defined (i) your samplesheet and (ii) your Sopa parameters (denoted below as `<TECHNOLOGY_PROFILE>`), you'll be able to run `nf-core/sopa`. The typical command for running the pipeline is as follows.
