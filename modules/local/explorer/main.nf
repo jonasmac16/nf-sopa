@@ -20,6 +20,9 @@ process EXPLORER {
     path "${meta.explorer_dir}/adata.h5ad"
     path "${meta.explorer_dir}/cells.zarr.zip"
 
+    when:
+    task.ext.when == null || task.ext.when
+
     script:
     """
     sopa explorer write ${sdata_path} --output-path ${meta.explorer_dir} ${cli_arguments} --mode "-it"

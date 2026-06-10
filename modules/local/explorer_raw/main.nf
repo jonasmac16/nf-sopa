@@ -18,6 +18,9 @@ process EXPLORER_RAW {
     path "${meta.explorer_dir}/morphology*"
     path "${meta.explorer_dir}/transcripts*", optional: true
 
+    when:
+    task.ext.when == null || task.ext.when
+
     script:
     """
     sopa explorer write ${sdata_path} --output-path ${meta.explorer_dir} ${argsExplorerRaw(data_dir.toString())} --mode "+it" --no-save-h5ad
