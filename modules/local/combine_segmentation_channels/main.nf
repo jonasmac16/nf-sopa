@@ -16,6 +16,6 @@ process COMBINE_SEGMENTATION_CHANNELS {
 
     script:
     """
-    python /opt/assets/monkey_patch_sopa_channels.py segmentation combine-channels ${sdata_path} ${cli_arguments}
+    python monkey_patch_sopa_channels.py segmentation combine-channels ${sdata_path} ${cli_arguments}
     """
 }
