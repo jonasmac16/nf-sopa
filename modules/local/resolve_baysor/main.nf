@@ -3,9 +3,7 @@ process RESOLVE_BAYSOR {
     tag "${meta.sample}"
 
     conda "${moduleDir}/environment.yml"
-    container "${workflow.containerEngine == 'apptainer' && !task.ext.singularity_pull_docker_container
-        ? 'oras://community.wave.seqera.io/library/python_pip_baysor_sopabaysor:70f197848d1b79c5'
-        : 'community.wave.seqera.io/library/python_pip_baysor_sopabaysor:4a532a683a27bd0f'}"
+    container "quay.io/nf-core/sopa:2.2.9-baysor"
 
     input:
     tuple val(meta), path(sdata_path), path(counts), path(polygons)
