@@ -1,0 +1,19 @@
+{
+  "$schema": "https://opencode.ai",
+  "compaction": {
+    "auto": true,
+    "prune": true,
+    "reserved": 20000
+  },
+  "permission": {
+    "skill": "allow",
+    "external_directory": "ask",
+    "lsp": "allow"
+  },
+  "lsp": {
+    "r": {
+      "command": ["R", "--slave", "-e", "languageserver::run()"],
+      "extensions": [".R", ".r", ".Rmd", ".rmd", ".qmd"]
+    }
+  }
+}
