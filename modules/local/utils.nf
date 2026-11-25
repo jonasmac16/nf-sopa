@@ -259,6 +259,34 @@ def getSpatialDataStepOperationMetadata() {
                 shapes_key: 'string',
             ],
         ],
+        background_correction: [
+            supported_stages: ['before_image_segmentation'],
+            required_args: ['image_key', 'channel', 'method'],
+            arg_types: [
+                image_key: 'string',
+                channel: 'string',
+                method: 'string',
+            ],
+        ],
+        merge_channels: [
+            supported_stages: ['before_image_segmentation'],
+            required_args: ['image_key', 'channels'],
+            arg_types: [
+                image_key: 'string',
+                channels: 'list',
+                output_channel: 'string',
+                method: 'string',
+            ],
+        ],
+        filter_cells: [
+            supported_stages: ['after_cellpose', 'after_stardist'],
+            required_args: ['filters'],
+            arg_types: [
+                source: 'string',
+                backup_key: 'string',
+                filters: 'list',
+            ],
+        ],
     ]
 }
 

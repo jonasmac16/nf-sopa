@@ -30,6 +30,10 @@
 
   > Marconato L, Palla G, Yamauchi K, Virshup I, Heidari E, Treis T, Toth M, Shrestha R, Vöhringer H, Huber W, Gerstung M, Moore J, Theis F, Stegle O. SpatialData: an open and universal data framework for spatial omics. bioRxiv 2023.05.05.539647; doi: https://doi.org/10.1101/2023.05.05.539647
 
+- [WEHI SODA Hub `sp_segment` channel-combination code](https://github.com/WEHI-SODA-Hub/sp_segment/blob/02bc645a7c53fb3b73deb272963d7a7adf316c6c/bin/combine_channels.py)
+
+  > The `merge_channels` operation adapts the channel-combination logic from `sp_segment/bin/combine_channels.py` (MIT licensed, copyright WEHI SODA Hub, 2025).
+
 ## Software packaging/containerisation tools
 
 - [Anaconda](https://anaconda.com)

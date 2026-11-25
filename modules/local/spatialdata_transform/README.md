@@ -35,21 +35,35 @@ Operations must **not** read arbitrary pipeline-global parameters, invoke Nextfl
   - args: `element_type` (one of `images`, `shapes`, `points`, `tables`), `element_key` (string).
 - `add_test_shapes`: test-only operation that adds a minimal shapes element with one dummy polygon. Useful for verifying that a mutation is persisted and consumed downstream.
   - args: `shapes_key` (string).
+- `background_correction`: single-channel background correction on an image.
+  - args: `image_key` (string), `channel` (string), `method` (string).
+  - Supported methods and their required parameters:
+    - `subtract_constant`: `value` (number).
+    - `divide`: `value` (number, non-zero).
+    - `gaussian`: `sigma` (number > 0).
+    - `rolling_ball`: `radius` (integer >= 0).
+    - `tophat`: `radius` (integer >= 0), optional `selem` (`disk` or `square`, default `disk`).
+- `merge_channels`: append a combined channel to an image using pixel-wise `max` or `prod`.
+  - args: `image_key` (string), `channels` (ordered list of strings), `output_channel` (string, default `combined_membrane`), `method` (`max` or `prod`, default `max`).
+- `filter_cells`: filter shapes using declarative numeric predicates and keep an unfiltered backup.
+  - args: `source` (string, default `cellpose_boundaries`), `backup_key` (string, default `cellpose_boundaries_unfiltered`), `filters` (list of predicate maps).
+  - Each predicate map contains: `column` (string), optional `min` (number), optional `max` (number), optional `keep_nulls` (boolean).
+  - `column` may be any numeric GeoDataFrame column or a geometry-derived property (`area`, `perimeter`, `bounds_minx`, `bounds_miny`, `bounds_maxx`, `bounds_maxy`).
 
 ## Stages
 
 The exact stage identifiers and their pipeline positions are:
 
-| Stage | Position |
-|---|---|
-| `after_conversion` | After `TO_SPATIALDATA` and `EXPLORER_RAW`, before downstream modification/segmentation |
-| `before_image_segmentation` | After optional tissue segmentation and before `MAKE_IMAGE_PATCHES` |
-| `after_cellpose` | After `RESOLVE_CELLPOSE`, before transcript patching or downstream transcript-based segmentation |
-| `after_stardist` | After Stardist resolution |
-| `after_transcript_segmentation` | After Baysor, Comseg, or Proseg |
-| `before_aggregation` | Immediately before `AGGREGATE` |
-| `after_aggregation` | Immediately after `AGGREGATE` |
-| `before_output` | After optional annotation/preprocessing and before final explorer/report generation |
+| Stage                           | Position                                                                                         |
+| ------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `after_conversion`              | After `TO_SPATIALDATA` and `EXPLORER_RAW`, before downstream modification/segmentation           |
+| `before_image_segmentation`     | After optional tissue segmentation and before `MAKE_IMAGE_PATCHES`                               |
+| `after_cellpose`                | After `RESOLVE_CELLPOSE`, before transcript patching or downstream transcript-based segmentation |
+| `after_stardist`                | After Stardist resolution                                                                        |
+| `after_transcript_segmentation` | After Baysor, Comseg, or Proseg                                                                  |
+| `before_aggregation`            | Immediately before `AGGREGATE`                                                                   |
+| `after_aggregation`             | Immediately after `AGGREGATE`                                                                    |
+| `before_output`                 | After optional annotation/preprocessing and before final explorer/report generation              |
 
 ## Adding a new operation
 

@@ -21,41 +21,49 @@ This is the **nf-core/sopa** Nextflow pipeline for spatial-omics preprocessing a
 ## Common commands
 
 Run a minimal smoke test:
+
 ```bash
 nextflow run . -profile test,docker --outdir results
 ```
 
 Run with a real technology profile:
+
 ```bash
 nextflow run . -profile docker,xenium_cellpose --input samplesheet.csv --outdir results
 ```
 
 Run the test suite (matches CI):
+
 ```bash
 nf-test test --tag test --profile +docker --verbose
 ```
 
 Run one test configuration:
+
 ```bash
 nf-test test tests/default.nf.test --profile +docker --verbose
 ```
 
 Update test snapshots after intentional output changes:
+
 ```bash
 nf-test test --tag test --profile +docker --verbose --update-snapshots
 ```
 
 Lint the pipeline (use `--release` on `main`/`master`):
+
 ```bash
 nf-core pipelines lint .
 ```
 
 Rebuild the JSON schema after parameter changes:
+
 ```bash
 nf-core pipelines schema build
 ```
 
 Run pre-commit checks locally:
+
 ```bash
 pre-commit run --all-files
 ```

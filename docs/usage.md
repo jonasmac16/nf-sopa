@@ -148,16 +148,16 @@ Operations are executed in the order they appear in the list, but only at their 
 
 ### Available stages
 
-| Stage | Position |
-|---|---|
-| `after_conversion` | After raw data conversion and raw explorer export, before downstream modification/segmentation |
-| `before_image_segmentation` | After optional tissue segmentation and before image-patch creation |
-| `after_cellpose` | After Cellpose resolution |
-| `after_stardist` | After Stardist resolution |
-| `after_transcript_segmentation` | After Baysor, Comseg, or Proseg |
-| `before_aggregation` | Immediately before aggregation |
-| `after_aggregation` | Immediately after aggregation |
-| `before_output` | Before final explorer/report generation |
+| Stage                           | Position                                                                                       |
+| ------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `after_conversion`              | After raw data conversion and raw explorer export, before downstream modification/segmentation |
+| `before_image_segmentation`     | After optional tissue segmentation and before image-patch creation                             |
+| `after_cellpose`                | After Cellpose resolution                                                                      |
+| `after_stardist`                | After Stardist resolution                                                                      |
+| `after_transcript_segmentation` | After Baysor, Comseg, or Proseg                                                                |
+| `before_aggregation`            | Immediately before aggregation                                                                 |
+| `after_aggregation`             | Immediately after aggregation                                                                  |
+| `before_output`                 | Before final explorer/report generation                                                        |
 
 ### Built-in operations
 
@@ -167,6 +167,68 @@ Operations are executed in the order they appear in the list, but only at their 
   - `args.element_key`: key of the element to check.
 
 Operation names, supported stages, argument schemas, and the execution contract are documented in `modules/local/spatialdata_transform/README.md`.
+
+### Example: background correction before segmentation
+
+Correct the DAPI channel before Cellpose/Stardist patching:
+
+```yaml
+spatialdata_steps:
+  - name: background_correction
+    stage: before_image_segmentation
+    args:
+      image_key: morphology_focus
+      channel: DAPI
+      method: rolling_ball
+      radius: 5
+```
+
+Supported methods:
+
+- `subtract_constant`: requires `value`.
+- `divide`: requires a non-zero `value`.
+- `gaussian`: requires `sigma`.
+- `rolling_ball`: requires integer `radius`.
+- `tophat`: requires integer `radius`; optional `selem` (`disk` or `square`).
+
+Only the selected channel is modified; all other channels, spatial coordinates, and coordinate transformations are preserved.
+
+### Example: merge membrane channels before segmentation
+
+Create a `combined_membrane` channel from two membrane channels for Cellpose:
+
+```yaml
+spatialdata_steps:
+  - name: merge_channels
+    stage: before_image_segmentation
+    args:
+      image_key: morphology_focus
+      channels: [membrane_a, membrane_b]
+      output_channel: combined_membrane
+      method: max
+
+cellpose_channels: "DAPI combined_membrane"
+```
+
+The original channels are retained and the combined channel is appended. `method` can be `max` (default) or `prod`.
+
+### Example: filter Cellpose boundaries before transcript segmentation
+
+Remove small Cellpose cells before Proseg/Baysor/Comseg consumes the boundaries:
+
+```yaml
+spatialdata_steps:
+  - name: filter_cells
+    stage: after_cellpose
+    args:
+      source: cellpose_boundaries
+      backup_key: cellpose_boundaries_unfiltered
+      filters:
+        - column: area
+          min: 50
+```
+
+`filter_cells` copies the complete source shapes element to the configured backup key before filtering. The backup is never used as a downstream prior unless explicitly configured elsewhere.
 
 ## Running the pipeline
 
