@@ -13,8 +13,6 @@ Treat scientific validity as distinct from software correctness.
 4. Load only retained domain references that apply:
    - bioinformatics/genomics/omics: `references/bioinformatics.md`
    - computational/systems biology: `references/computational-biology.md`
-   - mechanistic/mathematical modeling: `references/mathematical-biology.md`
-   - statistical inference/experimental design: `references/biostatistics.md`
 5. Distinguish computational correctness, numerical correctness, statistical validity, and scientific validity. Passing tests or completing a run establishes only part of that chain.
 6. Do not infer biological or mathematical semantics from variable names when metadata, documentation, equations, schemas, or study design can establish them.
 7. Record durable non-obvious scientific decisions and rationale in `docs/DECISIONS.md`; keep the project profile concise.

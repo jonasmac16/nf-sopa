@@ -10,10 +10,5 @@
     "external_directory": "ask",
     "lsp": "allow"
   },
-  "lsp": {
-    "r": {
-      "command": ["R", "--slave", "-e", "languageserver::run()"],
-      "extensions": [".R", ".r", ".Rmd", ".rmd", ".qmd"]
-    }
-  }
+  "lsp": {}
 }

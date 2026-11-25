@@ -9,8 +9,6 @@ description: Implement, modify, debug, or understand data-analysis and data-proc
 2. Identify the relevant input -> transformation -> output path and the narrowest executable entry point.
 3. Load only the reference files needed for the current task:
    - Python: `references/python.md`
-   - R: `references/r.md`
-   - Julia: `references/julia.md`
    - Markdown/notebooks/Quarto/R Markdown: `references/markdown-notebooks.md`
    - LSP navigation/diagnostics: `references/lsp.md`
 4. Follow the project's existing dependency, formatting, testing, and execution conventions.
