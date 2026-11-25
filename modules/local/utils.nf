@@ -220,6 +220,48 @@ def extractOutsDir(file) {
     return extractOutsDir(file.parent)
 }
 
+def getSpatialDataStepStages() {
+    return [
+        'after_conversion',
+        'before_image_segmentation',
+        'after_cellpose',
+        'after_stardist',
+        'after_transcript_segmentation',
+        'before_aggregation',
+        'after_aggregation',
+        'before_output',
+    ]
+}
+
+def getSpatialDataStepOperationNames() {
+    return getSpatialDataStepOperationMetadata().keySet() as List
+}
+
+def getSpatialDataStepOperationMetadata() {
+    return [
+        noop: [
+            supported_stages: [],
+            required_args: [],
+            arg_types: [:],
+        ],
+        assert_element: [
+            supported_stages: [],
+            required_args: ['element_type', 'element_key'],
+            arg_types: [
+                element_type: 'string',
+                element_key: 'string',
+            ],
+        ],
+        add_test_shapes: [
+            supported_stages: [],
+            required_args: ['shapes_key'],
+            arg_types: [
+                shapes_key: 'string',
+            ],
+        ],
+    ]
+}
+
 def argsToSpatialData(Map meta, String fullres_image_file) {
     def args = [
         technology: params.technology,

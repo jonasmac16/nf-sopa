@@ -10,7 +10,10 @@
             "type": "object",
             "fa_icon": "fas fa-terminal",
             "description": "Define where the pipeline should find input data and save output data.",
-            "required": ["input", "outdir"],
+            "required": [
+                "input",
+                "outdir"
+            ],
             "properties": {
                 "input": {
                     "type": "string",
@@ -131,7 +134,14 @@
                     "description": "Method used to save pipeline results to output directory.",
                     "help_text": "The Nextflow `publishDir` option specifies which intermediate files should be saved to the output directory. This option tells the pipeline what method should be used to move these files. See [Nextflow docs](https://www.nextflow.io/docs/latest/process.html#publishdir) for details.",
                     "fa_icon": "fas fa-copy",
-                    "enum": ["symlink", "rellink", "link", "copy", "copyNoFollow", "move"],
+                    "enum": [
+                        "symlink",
+                        "rellink",
+                        "link",
+                        "copy",
+                        "copyNoFollow",
+                        "move"
+                    ],
                     "hidden": true
                 },
                 "email_on_fail": {
@@ -175,7 +185,10 @@
                     "hidden": true
                 },
                 "help": {
-                    "type": ["boolean", "string"],
+                    "type": [
+                        "boolean",
+                        "string"
+                    ],
                     "description": "Display the help message."
                 },
                 "help_full": {
@@ -221,7 +234,9 @@
                     "help_text": "E.g., to select a specific merscope layer, use '{\"z_layers\": 2}'"
                 }
             },
-            "required": ["technology"],
+            "required": [
+                "technology"
+            ],
             "fa_icon": "fas fa-arrows-alt-h"
         },
         "patches": {
@@ -278,7 +293,10 @@
                 "mode": {
                     "type": "string",
                     "description": "Mode for the tissue segmentation: 'staining' or 'saturation' (for H&E images).",
-                    "enum": ["staining", "saturation"]
+                    "enum": [
+                        "staining",
+                        "saturation"
+                    ]
                 },
                 "tissue_segmentation_kwargs": {
                     "type": "string",
@@ -557,8 +575,16 @@
                     "description": "Cellpose `pretrained_model` parameter"
                 },
                 "cellpose_version": {
-                    "type": ["integer", "string"],
-                    "enum": [3, 4, "3", "4"],
+                    "type": [
+                        "integer",
+                        "string"
+                    ],
+                    "enum": [
+                        3,
+                        4,
+                        "3",
+                        "4"
+                    ],
                     "description": "Cellpose major version (3 or 4). Defaults to Cellpose v3. The 'gpu' profile selects the pytorch/CUDA image of the chosen version."
                 },
                 "cellpose_kwargs": {
@@ -621,6 +647,51 @@
                 }
             },
             "fa_icon": "fas fa-scroll"
+        },
+        "spatialdata_transform": {
+            "title": "SpatialData transformation",
+            "type": "object",
+            "description": "Ordered, declarative SpatialData transformation steps executed at fixed pipeline boundaries",
+            "default": "",
+            "properties": {
+                "spatialdata_steps": {
+                    "type": "array",
+                    "description": "List of transformation steps applied to the pipeline-generated SpatialData object.",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "name",
+                            "stage"
+                        ],
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": "Registered operation name to execute."
+                            },
+                            "stage": {
+                                "type": "string",
+                                "description": "Pipeline stage at which the operation is executed.",
+                                "enum": [
+                                    "after_conversion",
+                                    "before_image_segmentation",
+                                    "after_cellpose",
+                                    "after_stardist",
+                                    "after_transcript_segmentation",
+                                    "before_aggregation",
+                                    "after_aggregation",
+                                    "before_output"
+                                ]
+                            },
+                            "args": {
+                                "type": "object",
+                                "description": "Operation-specific arguments.",
+                                "default": {}
+                            }
+                        }
+                    }
+                }
+            },
+            "fa_icon": "fas fa-cogs"
         }
     },
     "allOf": [
@@ -677,6 +748,9 @@
         },
         {
             "$ref": "#/$defs/fluorescence_annotation"
+        },
+        {
+            "$ref": "#/$defs/spatialdata_transform"
         }
     ]
 }

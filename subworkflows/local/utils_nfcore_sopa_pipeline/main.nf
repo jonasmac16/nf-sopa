@@ -12,6 +12,8 @@ include { UTILS_NFSCHEMA_PLUGIN     } from '../../nf-core/utils_nfschema_plugin'
 include { paramsSummaryMap          } from 'plugin/nf-schema'
 include { samplesheetToList         } from 'plugin/nf-schema'
 include { paramsHelp                } from 'plugin/nf-schema'
+include { getSpatialDataStepStages        } from '../../../modules/local/utils'
+include { getSpatialDataStepOperationMetadata } from '../../../modules/local/utils'
 include { completionEmail           } from '../../nf-core/utils_nfcore_pipeline'
 include { completionSummary         } from '../../nf-core/utils_nfcore_pipeline'
 include { UTILS_NFCORE_PIPELINE     } from '../../nf-core/utils_nfcore_pipeline'
@@ -320,6 +322,80 @@ def validateParams(params) {
         }
         if (params.visium_hd_prior_shapes_key != null) {
             errors << "'visium_hd_prior_shapes_key' is only supported for Visium HD data, but technology is '${technology}'. Use 'prior_shapes_key' instead."
+        }
+    }
+
+    //
+    // Generic SpatialData transformation step validation
+    //
+    if (params.spatialdata_steps != null) {
+        if (!(params.spatialdata_steps instanceof List)) {
+            errors << "'spatialdata_steps' must be a list."
+        }
+        else {
+            def valid_stages = getSpatialDataStepStages()
+            def operation_metadata = getSpatialDataStepOperationMetadata()
+            params.spatialdata_steps.eachWithIndex { step, index ->
+                if (!(step instanceof Map)) {
+                    errors << "spatialdata_steps[${index}] must be a map with keys 'name', 'stage', and 'args'."
+                    return
+                }
+                if (!step.containsKey('name')) {
+                    errors << "spatialdata_steps[${index}] is missing required field 'name'."
+                }
+                else if (!(step.name in operation_metadata)) {
+                    errors << "spatialdata_steps[${index}] has unknown operation '${step.name}'. Valid operations: ${operation_metadata.keySet().join(', ')}."
+                }
+                if (!step.containsKey('stage')) {
+                    errors << "spatialdata_steps[${index}] is missing required field 'stage'."
+                }
+                else if (!(step.stage in valid_stages)) {
+                    errors << "spatialdata_steps[${index}] has unknown stage '${step.stage}'. Valid stages: ${valid_stages.join(', ')}."
+                }
+                def args = step.containsKey('args') ? step.args : [:]
+                if (!(args instanceof Map)) {
+                    errors << "spatialdata_steps[${index}] field 'args' must be a map."
+                }
+
+                // Operation-specific, data-independent contract checks
+                if (step.name in operation_metadata && step.stage in valid_stages && args instanceof Map) {
+                    def metadata = operation_metadata[step.name]
+                    if (metadata.supported_stages && !(step.stage in metadata.supported_stages)) {
+                        errors << "spatialdata_steps[${index}] operation '${step.name}' does not support stage '${step.stage}'. Supported stages: ${metadata.supported_stages.join(', ')}."
+                    }
+                    metadata.required_args.each { arg ->
+                        if (!args.containsKey(arg)) {
+                            errors << "spatialdata_steps[${index}] operation '${step.name}' is missing required argument '${arg}'."
+                        }
+                    }
+                    metadata.arg_types.each { arg, expected_type ->
+                        if (args.containsKey(arg)) {
+                            def arg_value = args[arg]
+                            def actual_type = (arg_value instanceof CharSequence) ? 'string' :
+                                              (arg_value instanceof Number) ? 'number' :
+                                              (arg_value instanceof Boolean) ? 'boolean' :
+                                              (arg_value instanceof List) ? 'list' :
+                                              (arg_value instanceof Map) ? 'map' : 'other'
+                            if (actual_type != expected_type) {
+                                errors << "spatialdata_steps[${index}] operation '${step.name}' argument '${arg}' must be ${expected_type}, got ${actual_type}."
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    //
+    // SpatialData transform hook / segmentation method compatibility
+    //
+    if (params.spatialdata_steps instanceof List) {
+        def requested_stages = params.spatialdata_steps.collect { it.stage }.toSet()
+        if ('after_cellpose' in requested_stages && !params.use_cellpose) {
+            errors << "spatialdata_steps contains 'after_cellpose' but 'use_cellpose' is not enabled."
+        }
+        if ('after_stardist' in requested_stages && !params.use_stardist) {
+            errors << "spatialdata_steps contains 'after_stardist' but 'use_stardist' is not enabled."
         }
     }
 

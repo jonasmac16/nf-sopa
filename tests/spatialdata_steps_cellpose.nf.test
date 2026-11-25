@@ -1,0 +1,31 @@
+nextflow_pipeline {
+
+    name "Test SpatialData transformation steps with Cellpose"
+    script "../main.nf"
+    profile "test_cellpose"
+    tag "spatialdata_steps"
+
+    test("after_cellpose hook is wired and consumed downstream") {
+
+        when {
+            params {
+                outdir = "$outputDir"
+                spatialdata_steps = [
+                    [name: 'noop', stage: 'after_cellpose', args: [:]]
+                ]
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def manifest = file("$outputDir/pipeline_info/spatialdata_steps/sample_name/after_cellpose.json")
+            assert manifest.exists()
+
+            // Downstream aggregation and explorer should still have run.
+            assert file("$outputDir/sample_name.zarr/tables/table/X/zarr.json").exists()
+            assert file("$outputDir/sample_name.explorer/experiment.xenium").exists()
+            assert snapshot(removeNextflowVersion("$outputDir/pipeline_info/nf_core_sopa_software_versions.yml")).match()
+        }
+    }
+}

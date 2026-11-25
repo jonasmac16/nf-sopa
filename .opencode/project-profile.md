@@ -1,19 +1,48 @@
 # Scientific project profile
 
-Status: uninitialized template
+Status: initialized
 
-Run `/init-analysis` before `/init` when starting a project from this template.
+## Domain and analysis type
 
-This file is the canonical project-specific scientific and language profile. `/init-analysis` owns and updates it; general repository initialization should not duplicate or reinterpret it in `AGENTS.md`.
+nf-core/sopa: a Nextflow pipeline for technology-invariant processing of image-based spatial omics at single-cell resolution (spatial transcriptomics and multiplex imaging). It ingests vendor outputs (Xenium, Visium HD, MERSCOPE, CosMx, PhenoCycler, MACSima, Molecular Cartography, OME-TIFF), optionally performs tissue and cell segmentation, aggregates transcripts or channel intensities to cells, optionally annotates/preprocesses them, and writes a SpatialData `.zarr` object and an `.explorer` directory for visualization.
 
-After initialization, keep this file concise and evidence-based. Record only project facts that materially affect scientific or computational work, such as:
+This repository is the workflow implementation; downstream statistical inference or cohort-level analysis is outside the pipeline's scope and is not encoded here.
 
-- scientific domain and analysis type;
-- primary and supporting programming languages;
-- unit of observation/inference and important identifier hierarchy;
-- study/experimental design and repeated/paired structure;
-- reference genome, annotation, database, coordinate system, or other versioned scientific resources;
-- important biological, mathematical, statistical, and numerical assumptions;
-- external DataLad input provenance and expected Apptainer execution model.
+## Languages
 
-Do not use this file as a transcript, literature review, or replacement for durable rationale in `docs/DECISIONS.md`.
+- **Primary:** Nextflow/Groovy.
+- **Supporting:** Python — only for existing Sopa/SpatialData/Scanpy/ComSeg/Cellpose/Stardist interfaces, version introspection, Python-dict parameter strings, the narrowly-scoped SpatialData transformation helpers under `modules/local/spatialdata_transform/`, and downstream output analysis. Keep pipeline orchestration in Nextflow/Groovy unless explicitly requested.
+- **Unused:** R and Julia.
+- **Documentation:** Markdown; no project notebooks, Quarto, or R Markdown found.
+
+## Scientific design
+
+- **Unit of observation:** raw transcripts and imaging-channel measurements; segmented cells are derived observations.
+- **Unit of inference:** not defined by this pipeline. Per-sample outputs are produced; any cohort-level inference is the responsibility of downstream analysis.
+- **Hierarchy:** a samplesheet row corresponds to one biological sample/region (or one Visium HD slide). Subject relationships, biological/technical replicates, pairing, conditions, batches, or longitudinal structure are not modeled in the samplesheet or schema.
+- **Patches:** image and transcript patches are computational subdivisions for scalable segmentation. They are not biological or technical replicates and must not be treated as independent observations in inference.
+
+## Reference resources
+
+Versioned resources that affect results and must be matched to the assay/species:
+
+- **Visium HD:** Space Ranger reference transcriptome. Default is `refdata-gex-GRCh38-2020-A.tar.gz`; `spaceranger_probeset` is user-specified. Do not silently use the human default for mouse or other references.
+- **Sopa Python package:** currently 2.2.12 (per module `environment.yml` files).
+- **Python runtime:** 3.12 in module environments.
+- **Segmentation models:** Cellpose/Stardist model names/types and priors are user-specified per predefined profile or CLI parameters.
+- **Spatial coordinates, micron-to-pixel transformations, image scales, and channel/transcript identifiers** must be preserved exactly; changing them changes biological interpretation.
+
+## Reproducibility and environment
+
+- **Orchestration:** Nextflow >=25.10.4; pipeline version 1.0.2.
+- **Execution:** container/Conda per process. Docker and Singularity are recommended by nf-core; Apptainer is supported via the `apptainer` profile. There is no project-specific Apptainer image or required container invocation.
+- **External inputs:** no DataLad inputs are part of this repository. User samplesheet paths point to local or mounted raw data; treat source data as immutable.
+- **Caching/resumption:** `-resume` depends on file contents, not just names.
+
+## Critical invariants
+
+1. Do not treat patch-level outputs or individual cells as independent biological replicates.
+2. Do not apply the default GRCh38 Space Ranger reference to non-human data.
+3. Preserve sample identity from samplesheet to output directory; output folders are `{sample}.zarr` and `{sample}.explorer`.
+4. Segmentation choices and their parameters (Cellpose, Baysor, Proseg, Comseg, Stardist, priors) are scientifically consequential; do not change them silently.
+5. Coordinate systems, transformations, and units (microns vs pixels) must remain consistent across patches and output objects.

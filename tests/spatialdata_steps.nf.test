@@ -1,0 +1,252 @@
+nextflow_pipeline {
+
+    name "Test SpatialData transformation steps"
+    script "../main.nf"
+    profile "test"
+    tag "spatialdata_steps"
+
+    // snapshots versions.yml
+
+    test("Empty spatialdata_steps leaves pipeline unchanged") {
+
+        when {
+            params {
+                outdir = "$outputDir"
+                spatialdata_steps = []
+            }
+        }
+
+        then {
+            assert workflow.success
+            // No transformation manifests should be published when no steps are configured.
+            assert !file("$outputDir/pipeline_info/spatialdata_steps").exists()
+            assert snapshot(removeNextflowVersion("$outputDir/pipeline_info/nf_core_sopa_software_versions.yml")).match()
+        }
+    }
+
+    test("Noop operation runs at after_conversion") {
+
+        when {
+            params {
+                outdir = "$outputDir"
+                spatialdata_steps = [
+                    [name: 'noop', stage: 'after_conversion', args: [:]]
+                ]
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def manifest = file("$outputDir/pipeline_info/spatialdata_steps/sample_name/after_conversion.json")
+            assert manifest.exists()
+
+            def parsed = new groovy.json.JsonSlurper().parse(manifest)
+            assert parsed.stage == 'after_conversion'
+            assert parsed.operations.size() == 1
+            assert parsed.operations[0].name == 'noop'
+            assert parsed.operations[0].args == [:]
+            assert parsed.before_summary == parsed.after_summary
+        }
+    }
+
+    test("Multiple operations run in configuration order") {
+
+        when {
+            params {
+                outdir = "$outputDir"
+                spatialdata_steps = [
+                    [name: 'noop', stage: 'after_conversion', args: [marker: 'first']],
+                    [name: 'noop', stage: 'after_conversion', args: [marker: 'second']]
+                ]
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def manifest = file("$outputDir/pipeline_info/spatialdata_steps/sample_name/after_conversion.json")
+            assert manifest.exists()
+
+            def parsed = new groovy.json.JsonSlurper().parse(manifest)
+            assert parsed.operations.size() == 2
+            assert parsed.operations[0].args.marker == 'first'
+            assert parsed.operations[1].args.marker == 'second'
+        }
+    }
+
+    test("Assert_element operation validates stage wiring") {
+
+        when {
+            params {
+                outdir = "$outputDir"
+                spatialdata_steps = [
+                    [name: 'assert_element', stage: 'after_aggregation', args: [element_type: 'tables', element_key: 'table']]
+                ]
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def manifest = file("$outputDir/pipeline_info/spatialdata_steps/sample_name/after_aggregation.json")
+            assert manifest.exists()
+
+            def parsed = new groovy.json.JsonSlurper().parse(manifest)
+            assert parsed.stage == 'after_aggregation'
+            assert parsed.operations[0].name == 'assert_element'
+            assert parsed.operations[0].report.found == true
+        }
+    }
+
+    test("Unknown operation fails early") {
+
+        when {
+            params {
+                outdir = "$outputDir"
+                spatialdata_steps = [
+                    [name: 'does_not_exist', stage: 'after_conversion', args: [:]]
+                ]
+            }
+        }
+
+        then {
+            assert workflow.failed
+        }
+    }
+
+    test("Unknown stage fails early") {
+
+        when {
+            params {
+                outdir = "$outputDir"
+                spatialdata_steps = [
+                    [name: 'noop', stage: 'invalid_stage', args: [:]]
+                ]
+            }
+        }
+
+        then {
+            assert workflow.failed
+        }
+    }
+
+    test("Raw explorer output is produced with after_conversion transform") {
+
+        when {
+            params {
+                outdir = "$outputDir"
+                spatialdata_steps = [
+                    [name: 'noop', stage: 'after_conversion', args: [:]]
+                ]
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert file("$outputDir/pipeline_info/spatialdata_steps/sample_name/after_conversion.json").exists()
+
+            // EXPLORER_RAW writes morphology* and optional transcripts* files.
+            def explorer_dir = file("$outputDir/sample_name.explorer")
+            assert explorer_dir.exists()
+            def raw_files = explorer_dir.listFiles().findAll { it.name.startsWith('morphology') || it.name.startsWith('transcripts') }
+            assert raw_files.size() > 0, "No raw explorer morphology/transcripts outputs found"
+        }
+    }
+
+    test("All fixed stages are wired") {
+
+        when {
+            params {
+                outdir = "$outputDir"
+                spatialdata_steps = [
+                    [name: 'noop', stage: 'after_conversion', args: [:]],
+                    [name: 'noop', stage: 'before_image_segmentation', args: [:]],
+                    [name: 'noop', stage: 'after_transcript_segmentation', args: [:]],
+                    [name: 'noop', stage: 'before_aggregation', args: [:]],
+                    [name: 'noop', stage: 'after_aggregation', args: [:]],
+                    [name: 'noop', stage: 'before_output', args: [:]]
+                ]
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def expected_stages = [
+                'after_conversion',
+                'before_image_segmentation',
+                'after_transcript_segmentation',
+                'before_aggregation',
+                'after_aggregation',
+                'before_output'
+            ]
+            expected_stages.each { stage ->
+                def manifest = file("$outputDir/pipeline_info/spatialdata_steps/sample_name/${stage}.json")
+                assert manifest.exists(), "Missing manifest for stage ${stage}"
+            }
+        }
+    }
+
+    test("Mutation is persisted and consumed downstream") {
+
+        when {
+            params {
+                outdir = "$outputDir"
+                spatialdata_steps = [
+                    [name: 'add_test_shapes', stage: 'after_aggregation', args: [shapes_key: 'transform_test_shapes']],
+                    [name: 'assert_element', stage: 'before_output', args: [element_type: 'shapes', element_key: 'transform_test_shapes']]
+                ]
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def manifest = file("$outputDir/pipeline_info/spatialdata_steps/sample_name/after_aggregation.json")
+            assert manifest.exists()
+
+            def parsed = new groovy.json.JsonSlurper().parse(manifest)
+            assert parsed.after_summary.shapes.contains('transform_test_shapes')
+
+            // The added shape element must survive through preprocessing/annotation and be present in the final published Zarr.
+            assert file("$outputDir/sample_name.zarr/shapes/transform_test_shapes").isDirectory()
+
+            // Downstream explorer ran on the mutated object.
+            assert file("$outputDir/sample_name.explorer/experiment.xenium").exists()
+        }
+    }
+
+    test("Missing required operation args fail early with a diagnostic") {
+
+        when {
+            params {
+                outdir = "$outputDir"
+                spatialdata_steps = [
+                    [name: 'assert_element', stage: 'after_conversion']
+                ]
+            }
+        }
+
+        then {
+            assert workflow.failed
+        }
+    }
+
+    test("after_cellpose rejected when cellpose is not enabled") {
+
+        when {
+            params {
+                outdir = "$outputDir"
+                use_cellpose = false
+                spatialdata_steps = [
+                    [name: 'noop', stage: 'after_cellpose', args: [:]]
+                ]
+            }
+        }
+
+        then {
+            assert workflow.failed
+        }
+    }
+}

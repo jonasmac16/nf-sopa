@@ -127,6 +127,47 @@ You'll also need to choose some Sopa parameters to decide which reader/segmentat
 
 These profiles contain the backbone of the pipeline, i.e. which technology to use and how to process the segmentation. For more customization, you can provide [other Sopa parameters](https://nf-co.re/sopa/dev/parameters/) via the command line, for instance `--use_scanpy_preprocessing true` if you want to have a UMAP and a Leiden clustering on your output AnnData object.
 
+## Generic SpatialData transformations
+
+The pipeline supports ordered, declarative modifications to the generated SpatialData object at fixed pipeline boundaries. This is configured via the `spatialdata_steps` parameter, a list of operation entries:
+
+```yaml
+spatialdata_steps:
+  - name: noop
+    stage: after_conversion
+    args: {}
+```
+
+Each entry must contain:
+
+- `name`: a registered operation name (e.g., `noop`, `assert_element`).
+- `stage`: the pipeline boundary at which to run the operation.
+- `args`: operation-specific arguments (default `{}`).
+
+Operations are executed in the order they appear in the list, but only at their declared stage. An empty list (`spatialdata_steps: []`, the default) adds no transform tasks and leaves pipeline behavior unchanged.
+
+### Available stages
+
+| Stage | Position |
+|---|---|
+| `after_conversion` | After raw data conversion and raw explorer export, before downstream modification/segmentation |
+| `before_image_segmentation` | After optional tissue segmentation and before image-patch creation |
+| `after_cellpose` | After Cellpose resolution |
+| `after_stardist` | After Stardist resolution |
+| `after_transcript_segmentation` | After Baysor, Comseg, or Proseg |
+| `before_aggregation` | Immediately before aggregation |
+| `after_aggregation` | Immediately after aggregation |
+| `before_output` | Before final explorer/report generation |
+
+### Built-in operations
+
+- `noop`: identity operation, useful for testing wiring.
+- `assert_element`: validates that a SpatialData element exists.
+  - `args.element_type`: one of `images`, `shapes`, `points`, `tables`.
+  - `args.element_key`: key of the element to check.
+
+Operation names, supported stages, argument schemas, and the execution contract are documented in `modules/local/spatialdata_transform/README.md`.
+
 ## Running the pipeline
 
 Once you have defined (i) your samplesheet and (ii) your Sopa parameters (denoted below as `<TECHNOLOGY_PROFILE>`), you'll be able to run `nf-core/sopa`. The typical command for running the pipeline is as follows.

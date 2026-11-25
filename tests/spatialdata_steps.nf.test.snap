@@ -1,0 +1,32 @@
+{
+    "Empty spatialdata_steps leaves pipeline unchanged": {
+        "content": [
+            {
+                "FLUO_ANNOTATION": {
+                    "sopa": "2.2.12"
+                },
+                "PATCH_SEGMENTATION_PROSEG": {
+                    "proseg": "3.1.1",
+                    "sopa": "2.2.12"
+                },
+                "SCANPY_PREPROCESS": {
+                    "scanpy": "1.12.4",
+                    "sopa": "2.2.12"
+                },
+                "TO_SPATIALDATA": {
+                    "sopa": "2.2.12",
+                    "spatialdata": "0.8.0",
+                    "spatialdata_io": "0.7.0"
+                },
+                "Workflow": {
+                    "nf-core/sopa": "v1.0.2"
+                }
+            }
+        ],
+        "timestamp": "2026-11-24T15:43:52.987749959",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.10.7"
+        }
+    }
+}

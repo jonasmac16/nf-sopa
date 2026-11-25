@@ -1,159 +1,102 @@
-# Baseline instructions for this data-analysis project
-These baseline rules apply to this repository. For a new project from this template, run `/init-analysis` before `/init`. `/init-analysis` owns `.opencode/project-profile.md`; `/init` should refine this file with concrete repository facts and commands while preserving applicable safety, provenance, reproducibility, and scientific-validity rules.
+# Agent instructions for nf-core/sopa
 
-## Work from evidence
+This is the **nf-core/sopa** Nextflow pipeline for spatial-omics preprocessing at single-cell resolution. The canonical scientific/language profile is `.opencode/project-profile.md`; consult that before interpreting biological design, reference resources, or language choices.
 
-- Inspect the repository before assuming its language, layout, environment, data locations, workflow, or output conventions.
-- Projects may use Python, R, Julia, shell, Markdown, or a subset of them.
-- Prefer existing project commands, task runners, configuration, and documented workflows over introducing new mechanisms.
-- Make the smallest change that solves the requested problem; keep analysis changes separate from unrelated refactors.
-- Validate expensive work on a representative subset, dry run, focused test, or smoke test before running full data.
+## Architecture and key files
 
-## Model the analysis workflow
+- **Entry point:** `main.nf` → `workflows/sopa.nf` → `subworkflows/local/` → `modules/local/`.
+- **Owned code:** `modules/local/` and `subworkflows/local/`. Treat `modules/nf-core/` and `subworkflows/nf-core/` as vendored; avoid editing them in place.
+- **Parameters:** declared in `nextflow.config`; documented in `nextflow_schema.json`.
+- **Samplesheet schema:** `assets/schema_input.json`.
+- **Predefined technology profiles:** `conf/predefined/*.config`.
+- **Resource labels:** `conf/base.config`.
+- **Module options / publishing:** `conf/modules.config`.
 
-When relevant, identify:
+## Languages
 
-1. source inputs;
-2. intermediate data;
-3. analysis/processing code;
-4. generated results;
-5. figures, tables, and reports;
-6. environment/container identity;
-7. provenance information;
-8. executable entry points.
+- **Nextflow/Groovy** is the primary implementation language.
+- **Python** is supporting only: it is used through the Sopa/SpatialData/Scanpy/Cellpose/ComSeg/Stardist command-line interfaces, small `python -c` version checks, and the narrowly-scoped SpatialData transformation helpers under `modules/local/spatialdata_transform/`.
+- **R and Julia** are not project languages.
 
-Do not infer semantic meaning from filenames when code, metadata, schemas, or documentation can establish it.
+## Common commands
 
-## Scientific project profile and validity
+Run a minimal smoke test:
+```bash
+nextflow run . -profile test,docker --outdir results
+```
 
-`.opencode/project-profile.md` is the canonical project-specific scientific/language profile produced by `/init-analysis`. Before substantive scientific analysis or interpretation, consult it when present and initialized. Do not duplicate its project facts into `AGENTS.md` unless an operational instruction genuinely belongs here.
+Run with a real technology profile:
+```bash
+nextflow run . -profile docker,xenium_cellpose --input samplesheet.csv --outdir results
+```
 
-Scientific correctness is distinct from software correctness. When relevant:
+Run the test suite (matches CI):
+```bash
+nf-test test --tag test --profile +docker --verbose
+```
 
-- identify the scientific question and analysis type;
-- distinguish unit of observation from unit of inference;
-- preserve meaningful subject/sample/replicate/visit/run or analogous hierarchy;
-- respect experimental/study design, pairing, repeated measures, clustering, batch, and data-splitting boundaries;
-- make biological/mathematical/statistical assumptions explicit;
-- version reference genomes, annotations, databases, coordinate systems, model parameter sources, or other scientific references that can change results;
-- preserve units, parameter conventions, random seeds, and numerical tolerances when they affect conclusions.
+Run one test configuration:
+```bash
+nf-test test tests/default.nf.test --profile +docker --verbose
+```
 
-Use the `scientific-analysis` skill for domain-specific guidance. A successful run or passing software test does not by itself establish numerical, statistical, or scientific validity.
+Update test snapshots after intentional output changes:
+```bash
+nf-test test --tag test --profile +docker --verbose --update-snapshots
+```
 
-## Protect data
+Lint the pipeline (use `--release` on `main`/`master`):
+```bash
+nf-core pipelines lint .
+```
 
-Treat source data as immutable unless modification is explicitly requested.
+Rebuild the JSON schema after parameter changes:
+```bash
+nf-core pipelines schema build
+```
 
-- Do not overwrite raw/source data.
-- Do not move, rename, delete, drop, save, or commit external dataset content merely to simplify a task.
-- Do not copy large source datasets into the analysis repository unless this is an established project convention.
-- Avoid committing large derived data, container images, transient caches, or generated artifacts unless the project explicitly tracks them.
-- Before destructive data operations, obtain explicit authorization.
+Run pre-commit checks locally:
+```bash
+pre-commit run --all-files
+```
 
-## External DataLad datasets
+## Testing and CI gotchas
 
-Datasets consumed by the analysis may be outside the current worktree.
+- `nf-test.config` sources `tests/nextflow.config` and uses the `test` profile by default; it ignores vendored nf-core module tests.
+- Test data is fetched from `nf-core/test-datasets/sopa/` and `nf-core/test-datasets/modules/`.
+- CI tests run with Docker, Singularity, and Conda; Conda and Singularity are only required to pass on PRs targeting `main`/`master`. Nextflow `latest-everything` is allowed to fail.
+- Snapshots capture stable paths and contents; unstable outputs are excluded via `tests/.nftignore`.
+- The pre-commit hook `.hooks/block_pipeline_outdir.sh` blocks any commit that includes a `pipeline_info` output directory. Do not commit pipeline test outputs to the repository.
 
-- Treat external DataLad datasets as read-only inputs by default.
-- Inspect dataset state before assuming annexed content is locally present.
-- Retrieve only content needed for the current task; do not recursively obtain an entire dataset by default.
-- Preserve enough information to identify the exact dataset revision used.
-- Do not `save`, `drop`, `uninstall`, remove, or otherwise mutate an external dataset unless explicitly requested.
-- Do not add an external dataset to the current repository merely because the analysis consumes it.
+## Environment and containers
 
-## Reproducible environments and Apptainer
+- Devcontainer: `nfcore/devcontainer:latest` (see `.devcontainer/devcontainer.json`).
+- Host tooling needed: Nextflow `>=25.10.4`, nf-test, nf-core tools (version pinned in `.nf-core.yml`, currently `4.2.1`), plus Docker/Singularity/Apptainer or Conda.
+- `SPACERANGER_COUNT` does **not** support Conda; Visium HD paths must use Docker/Singularity/Apptainer.
+- Cellpose has dynamic environments/containers: `cellpose_version=4` and the `gpu` profile select alternate Conda envs/images in `conf/modules.config`. Do not hardcode a single Cellpose environment path.
+- Apptainer is supported via the `apptainer` profile but is not the sole required execution model.
 
-Prefer the environment documented by the project.
+## Parameter and code conventions
 
-- Start OpenCode with the standard host command `opencode` from the project root. When the project specifies an Apptainer container, use the documented container invocation (for example, `apptainer exec <image.sif> opencode`).
-- When an Apptainer container is the expected environment, run analysis commands through it rather than modifying the host environment.
-- Do not install host or container packages interactively merely to make a command work unless dependency modification is part of the task.
-- Do not silently substitute another image or the host environment.
-- Record/report container identity when reproducibility matters.
-- Container definitions maintained in another repository are a separate project; do not modify that repository as a side effect of analysis work.
-- Do not rebuild containers automatically unless required by the task.
+- Add new parameters to both `nextflow.config` and `nextflow_schema.json`; use `nf-core pipelines schema build` to keep them in sync.
+- Define default resource requirements for new local processes with labels in `conf/base.config`.
+- Pass tool-specific arguments via `ext.args` in `conf/modules.config` rather than editing module scripts.
+- Segmentation constraints (enforced at runtime):
+  - At least one method must be enabled.
+  - Only one transcript-based method (`use_baysor`, `use_comseg`, `use_proseg`).
+  - Only one staining-based method (`use_cellpose`, `use_stardist`).
+  - Imaging-only technologies (`macsima`, `phenocycler`, `hyperion`, `ome_tif`) cannot use transcript-based methods.
 
-## Reproducibility
+## Data, provenance, and safety
 
-- Make important parameters explicit.
-- Seed stochastic work when results depend on randomness.
-- Avoid machine-specific absolute paths in committed code; prefer project-root-relative paths, configuration, CLI arguments, or environment variables.
-- Do not rely on hidden interactive state in Python, R, Julia, notebooks, or IDE sessions.
-- Avoid undocumented manual preprocessing steps.
-- Preserve existing provenance and metadata mechanisms.
-- When changing a pipeline, consider whether cached or previously generated outputs are invalidated.
-
-## Validate data transformations
-
-For important transformations, validate whichever contracts apply:
-
-- expected columns/fields and types;
-- units and encodings;
-- identifier/key uniqueness;
-- duplicates and missingness;
-- valid ranges and categorical levels;
-- row counts before and after filters;
-- join cardinality and unmatched keys;
-- ordering and grouping assumptions;
-- output shape and identifiers.
-
-Treat unexpected many-to-many joins, silent coercions, severe row loss, and unexpected record multiplication as likely bugs until explained.
-
-## Language-specific work
-
-Use the `data-analysis` skill for language-specific guidance. Treat the initialized `.opencode/project-profile.md` and retained language references as authoritative for supported languages. Follow the repository's existing dependency, formatting, linting, typing, testing, and packaging choices; do not introduce a pruned/unused language or a second toolchain without a concrete need and explicit user agreement.
-
-## LSP and diagnostics
-
-Use LSP navigation/diagnostics when the installed OpenCode runtime and project language server support it. Do not depend on LSP being available.
-
-- Prefer targeted symbol lookup over reading many large files when LSP can answer the question.
-- Treat project lint, type-check, compiler, and test commands as authoritative verification.
-- If LSP disagrees with project tooling, investigate the discrepancy rather than silently choosing one.
-
-## Git
-
-- Inspect repository status before broad modifications.
-- Do not discard unrelated user changes.
-- Do not rewrite history, commit, push, tag, or create branches unless requested or required by an established workflow.
-- Never commit secrets or credentials.
-- Keep code/version-control concerns separate from external dataset provenance where DataLad manages data inputs.
+- Treat raw source data as immutable. Do not move, rename, delete, or commit external dataset content to this repository.
+- This pipeline has no project DataLad inputs; user samplesheet paths point to local or mounted raw data.
+- Default Visium HD Space Ranger reference is **human GRCh38-2020-A**. Override `spaceranger_reference` and `spaceranger_probeset` for mouse or other references.
+- Preserve sample identity, spatial coordinate systems, micron-to-pixel transformations, image scales, and channel/transcript identifiers across patches and outputs.
+- Record exact parameter files, pipeline version, and container/Conda environment identities when reproducibility matters.
 
 ## Documentation
 
-Update Markdown documentation when changes alter execution, inputs, outputs, parameters, environment, important assumptions, interpretation, or provenance procedures.
-
-Prefer concise documentation with executable commands over unverifiable prose.
-
-## Verification
-
-After modifying code:
-
-1. run the narrowest relevant check;
-2. run existing formatting/lint/type checks where applicable;
-3. run focused tests;
-4. validate relevant data invariants;
-5. use a small representative input before a full analysis run.
-
-Never claim a command or test succeeded unless it actually ran successfully. If verification is blocked by missing data, container images, language servers, external resources, or compute, state exactly what was and was not verified.
-
-## External directories
-
-Repositories, DataLad datasets, container sources, and resources outside the current worktree are separate resources. Read them when necessary and authorized, but do not modify them as a side effect of current-project work.
-
-## What `/init` should add for this project
-
-After `/init-analysis`, `/init` should capture concrete operational facts that can be established from the repository. Treat `.opencode/project-profile.md` as authoritative for scientific domain/language profile rather than duplicating it here. Add, as applicable:
-
-- project purpose and outputs;
-- language-specific commands, environments, and file locations only for languages retained by `.opencode/project-profile.md`;
-- important directories and pipeline entry points;
-- test, lint, format, type-check, and validation commands;
-- expected Apptainer image and invocation;
-- external dataset locations/acquisition mechanisms and DataLad conventions;
-- output/intermediate locations;
-- expensive or unsafe operations to avoid;
-- operational consequences of project-specific scientific assumptions when they affect commands, validation, or safety;
-- documentation conventions and known operational gotchas.
-
-Do not add instructions for languages or tools that the repository does not use. Do not remove or weaken the baseline safety, provenance, reproducibility, data-validation, or scientific-validity rules above.
+- Update `docs/usage.md` and `docs/output.md` when parameters, inputs, outputs, or behavior change.
+- Update `CITATIONS.md` when adding or removing tools.
+- Keep durable scientific rationale in `docs/DECISIONS.md`, not in `AGENTS.md` or `.opencode/project-profile.md`.
