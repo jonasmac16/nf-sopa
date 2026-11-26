@@ -14,7 +14,8 @@ from scipy import ndimage
 from skimage.morphology import disk, square, white_tophat
 from skimage.restoration import rolling_ball
 from spatialdata import SpatialData
-from spatialdata.models import ShapesModel, TableModel
+from spatialdata.models import Image2DModel, ShapesModel, TableModel
+from spatialdata.transformations import get_transformation
 
 
 class OperationError(Exception):
@@ -472,6 +473,9 @@ class BackgroundCorrectionOperation(Operation):
 # ---- merge channels --------------------------------------------------------
 
 
+_SOPA_CELL_SEGMENTATION_ATTR = "cell_segmentation_image"
+
+
 def _to_uint16(array: xr.DataArray) -> xr.DataArray:
     """Convert an array to uint16 using the WEHI SODA Hub reference scaling rule."""
     max_value = float(array.max())
@@ -481,13 +485,67 @@ def _to_uint16(array: xr.DataArray) -> xr.DataArray:
     return array.astype(np.uint16)
 
 
+def _get_image_scale_factors(image: Any) -> list[int] | None:
+    """Infer the Image2DModel scale factors from an existing multiscale image."""
+    if not _is_multiscale_image(image):
+        return None
+
+    scale_names = sorted(image.keys(), key=lambda name: int(name.replace("scale", "")))
+    factors: list[int] = []
+    for prev_name, next_name in zip(scale_names[:-1], scale_names[1:]):
+        prev_da = image[prev_name]["image"]
+        next_da = image[next_name]["image"]
+        factor_y = prev_da.sizes["y"] // next_da.sizes["y"]
+        factor_x = prev_da.sizes["x"] // next_da.sizes["x"]
+        if factor_y != factor_x:
+            raise OperationError(
+                f"Non-square scale factor between '{prev_name}' and '{next_name}': {factor_y}x{factor_x}."
+            )
+        factors.append(factor_y)
+    return factors
+
+
+def _get_image_transformations(image: Any) -> dict[str, Any] | None:
+    """Return the coordinate transformations attached to a SpatialData image element."""
+    try:
+        return get_transformation(image, get_all=True)
+    except Exception:
+        return None
+
+
+def _merge_channel_group(
+    da: xr.DataArray,
+    source_channels: list[str],
+    output_channel: str,
+    method: str,
+) -> xr.DataArray:
+    """Create one output channel from one or more source channels.
+
+    Single-source channels are copied exactly (with the output channel label).
+    Multi-source channels are merged with the selected method.
+    """
+    if len(source_channels) == 1:
+        merged = da.sel(c=source_channels[0])
+    else:
+        selected = da.sel(c=source_channels)
+        if method == "max":
+            merged = selected.max(dim="c")
+        elif method == "prod":
+            merged = selected.astype(np.uint64).prod(dim="c")
+            merged = _to_uint16(merged)
+        else:
+            raise OperationError(f"Unknown merge_channels method '{method}'; use 'max' or 'prod'.")
+
+    return merged.expand_dims(c=[output_channel])
+
+
 def _merge_channels_single_scale(
     da: xr.DataArray,
     channels: list[str],
     output_channel: str,
     method: str,
 ) -> xr.DataArray:
-    """Append a combined channel to a single-scale image DataArray."""
+    """Append a combined channel to a single-scale image DataArray (legacy mode)."""
     if len(channels) == 1:
         return da
 
@@ -510,11 +568,19 @@ def _merge_channels_single_scale(
 
 
 class MergeChannelsOperation(Operation):
-    """Combine selected image channels into an additional channel.
+    """Combine selected image channels into an additional channel or a new image.
 
-    The implementation follows the channel-combination behaviour of
-    WEHI SODA Hub's ``combine_channels.py`` (MIT licensed), adapted to the
-    SpatialData/xarray/dask conventions used by SOPA.
+    Two modes are supported:
+
+    1. Legacy append mode (default): merge one group of channels and append the
+       result to the source image. The source image is modified in place.
+    2. Segmentation-image mode: create a separate multiscale image containing
+       one or more channel groups. The source image is left unchanged, and the
+       new image is registered as the cell segmentation image.
+
+    The channel-group syntax is a mapping from output channel name to an ordered
+    list of source channels. Single-source groups are copied exactly;
+    multi-source groups are merged with the selected method.
 
     Supported methods:
 
@@ -522,9 +588,6 @@ class MergeChannelsOperation(Operation):
     - ``prod``: pixel-wise product over the selected channels, computed in
       ``uint64`` and converted back to ``uint16`` with the reference scaling
       rule.
-
-    The combined channel is appended to the original image; the original
-    channels are retained.
     """
 
     name = "merge_channels"
@@ -536,21 +599,48 @@ class MergeChannelsOperation(Operation):
         args = context.get("args", {})
 
         image_key = _require_arg(args, "image_key", str)
-        channels = _require_arg(args, "channels", list)
+        output_image_key = args.get("output_image_key")
+        channel_groups = args.get("channel_groups")
+        channels = args.get("channels")
         output_channel = args.get("output_channel", "combined_membrane")
         method = args.get("method", "max")
 
-        if not isinstance(output_channel, str) or not output_channel:
-            raise OperationError("output_channel must be a non-empty string.")
+        if output_image_key is not None:
+            if not isinstance(output_image_key, str) or not output_image_key:
+                raise OperationError("output_image_key must be a non-empty string.")
+            if image_key == output_image_key:
+                raise OperationError("output_image_key must differ from image_key.")
+            if output_image_key in sdata.images:
+                raise OperationError(f"Image '{output_image_key}' already exists.")
+
+            channel_groups = _require_arg(args, "channel_groups", dict)
+            if not channel_groups:
+                raise OperationError("channel_groups must contain at least one group.")
+            for output_ch, source_channels in channel_groups.items():
+                if not isinstance(output_ch, str) or not output_ch:
+                    raise OperationError("All channel_groups keys must be non-empty strings.")
+                if not isinstance(source_channels, list) or not source_channels:
+                    raise OperationError(f"Channel group '{output_ch}' must contain at least one source channel.")
+                if not all(isinstance(ch, str) and ch for ch in source_channels):
+                    raise OperationError(f"All source channels in group '{output_ch}' must be non-empty strings.")
+                if len(source_channels) != len(set(source_channels)):
+                    raise OperationError(f"Duplicate source channels in group '{output_ch}': {source_channels}.")
+
+        elif channels is not None:
+            if not isinstance(channels, list) or not channels:
+                raise OperationError("merge_channels requires at least one channel.")
+            if not all(isinstance(ch, str) and ch for ch in channels):
+                raise OperationError("All entries in 'channels' must be non-empty strings.")
+            if len(channels) != len(set(channels)):
+                raise OperationError(f"Duplicate channel selections are not allowed: {channels}.")
+            if not isinstance(output_channel, str) or not output_channel:
+                raise OperationError("output_channel must be a non-empty string.")
+
+        else:
+            raise OperationError("Provide either 'channels' (legacy mode) or 'channel_groups' (segmentation-image mode).")
+
         if method not in ("max", "prod"):
             raise OperationError(f"merge_channels method must be 'max' or 'prod', got '{method}'.")
-
-        if not channels:
-            raise OperationError("merge_channels requires at least one channel.")
-        if not all(isinstance(ch, str) and ch for ch in channels):
-            raise OperationError("All entries in 'channels' must be non-empty strings.")
-        if len(channels) != len(set(channels)):
-            raise OperationError(f"Duplicate channel selections are not allowed: {channels}.")
 
         if image_key not in sdata.images:
             raise OperationError(
@@ -560,30 +650,48 @@ class MergeChannelsOperation(Operation):
         image = sdata.images[image_key]
         scale_arrays = _get_scale_arrays(image)
 
+        source_channels_to_check = (
+            [ch for group in channel_groups.values() for ch in group]
+            if channel_groups is not None
+            else channels
+        )
+
         for scale_name, da_arr in scale_arrays:
             if "c" not in da_arr.dims:
                 raise OperationError(
                     f"Image '{image_key}' scale '{scale_name}' has no channel dimension."
                 )
             available = list(da_arr.coords.get("c", []).values)
-            missing = [ch for ch in channels if ch not in available]
+            missing = [ch for ch in source_channels_to_check if ch not in available]
             if missing:
                 raise OperationError(
                     f"Scale '{scale_name}' is missing channels {missing}. Available: {available}."
                 )
-            if output_channel in available:
-                raise OperationError(
-                    f"Output channel '{output_channel}' already exists in image '{image_key}' scale '{scale_name}'."
-                )
+
+        if channel_groups is None:
+            for scale_name, da_arr in scale_arrays:
+                available = list(da_arr.coords.get("c", []).values)
+                if output_channel in available:
+                    raise OperationError(
+                        f"Output channel '{output_channel}' already exists in image '{image_key}' scale '{scale_name}'."
+                    )
 
     def apply(self, sdata: SpatialData, context: dict[str, Any]) -> tuple[SpatialData, dict[str, Any]]:
         args = context.get("args", {})
         image_key = args["image_key"]
-        channels = list(args["channels"])
-        output_channel = args.get("output_channel", "combined_membrane")
+        output_image_key = args.get("output_image_key")
+        channel_groups = args.get("channel_groups")
         method = args.get("method", "max")
 
         image = sdata.images[image_key]
+
+        if output_image_key is not None:
+            return self._apply_segmentation_image(
+                sdata, image_key, output_image_key, channel_groups, method
+            )
+
+        channels = list(args["channels"])
+        output_channel = args.get("output_channel", "combined_membrane")
         scale_arrays = _get_scale_arrays(image)
 
         for scale_name, da_arr in scale_arrays:
@@ -604,6 +712,51 @@ class MergeChannelsOperation(Operation):
             "output_channels": list(image.coords["c"].values)
             if isinstance(image, xr.DataArray)
             else list(image["scale0"]["image"].coords["c"].values),
+        }
+
+    def _apply_segmentation_image(
+        self,
+        sdata: SpatialData,
+        image_key: str,
+        output_image_key: str,
+        channel_groups: dict[str, list[str]],
+        method: str,
+    ) -> tuple[SpatialData, dict[str, Any]]:
+        image = sdata.images[image_key]
+        scale_arrays = _get_scale_arrays(image)
+        scale0_da = scale_arrays[0][1]
+
+        merged_channels: list[xr.DataArray] = []
+        for output_ch, source_channels in channel_groups.items():
+            merged_channels.append(_merge_channel_group(scale0_da, source_channels, output_ch, method))
+
+        merged_da = xr.concat(merged_channels, dim="c")
+        merged_da.attrs.update({k: v for k, v in scale0_da.attrs.items() if k != "transform"})
+        merged_da.attrs.pop("transform", None)
+        merged_da.name = scale0_da.name
+
+        scale_factors = _get_image_scale_factors(image)
+        transformations = _get_image_transformations(image)
+
+        new_image = Image2DModel.parse(
+            merged_da,
+            c_coords=list(merged_da.coords["c"].values),
+            scale_factors=scale_factors,
+            transformations=transformations,
+        )
+
+        sdata.images[output_image_key] = new_image
+        sdata.attrs[_SOPA_CELL_SEGMENTATION_ATTR] = output_image_key
+
+        return sdata, {
+            "image_key": image_key,
+            "output_image_key": output_image_key,
+            "channel_groups": channel_groups,
+            "method": method,
+            "input_dtype": str(scale0_da.dtype),
+            "output_channels": list(new_image["scale0"]["image"].coords["c"].values)
+            if _is_multiscale_image(new_image)
+            else list(new_image.coords["c"].values),
         }
 
 

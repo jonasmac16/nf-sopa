@@ -19,7 +19,7 @@ from geopandas import GeoDataFrame
 from shapely.geometry import Polygon
 from spatialdata import SpatialData
 from spatialdata.models import Image2DModel, ShapesModel
-from spatialdata.transformations import Identity
+from spatialdata.transformations import Identity, get_transformation
 
 # Allow importing the operation module without treating the whole repo as a package.
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -29,6 +29,7 @@ from operations import (  # noqa: E402
     FilterCellsOperation,
     MergeChannelsOperation,
     OperationError,
+    _is_multiscale_image,
 )
 
 
@@ -147,6 +148,64 @@ def test_merge_channels_prod_scaling():
     expected = min(int(300 * 300 * 65534 / 65535), 65535)
     merged = sdata2.images["im"].sel(c="prod_ch").compute()
     assert (merged == expected).all()
+
+
+def test_merge_channels_creates_segmentation_image():
+    arr = np.zeros((3, 8, 8), dtype=np.uint16)
+    arr[0] = 10  # DNA
+    arr[1] = 20  # Membrane
+    arr[2] = 30  # PanCK
+    da = xr.DataArray(arr, dims=["c", "y", "x"])
+    da.attrs["custom_source_attr"] = "preserved"
+    im = Image2DModel.parse(
+        da,
+        c_coords=["DNA", "Membrane", "PanCK"],
+        scale_factors=[2, 2],
+        transformations={"global": Identity()},
+    )
+    sdata = SpatialData(images={"stitched_image": im})
+
+    ctx = {
+        "args": {
+            "image_key": "stitched_image",
+            "output_image_key": "segmentation_image",
+            "channel_groups": {
+                "nuclear": ["DNA"],
+                "membrane": ["Membrane", "PanCK"],
+            },
+            "method": "max",
+        },
+        "stage": "before_image_segmentation",
+    }
+    MergeChannelsOperation().validate(ctx, sdata)
+    sdata2, report = MergeChannelsOperation().apply(sdata, ctx)
+
+    assert "segmentation_image" in sdata2.images
+    assert sdata2.attrs.get("cell_segmentation_image") == "segmentation_image"
+    assert "stitched_image" in sdata2.images
+
+    seg = sdata2.images["segmentation_image"]
+    assert _is_multiscale_image(seg)
+    assert list(seg["scale0"]["image"].coords["c"].values) == ["nuclear", "membrane"]
+    assert list(seg.keys()) == list(im.keys())
+
+    # nuclear copied exactly; membrane = max(Membrane, PanCK)
+    scale0 = seg["scale0"]["image"].compute()
+    assert (scale0.sel(c="nuclear") == 10).all()
+    assert (scale0.sel(c="membrane") == 30).all()
+
+    # Transformations preserved on the output image
+    assert get_transformation(seg, get_all=True) == get_transformation(im, get_all=True)
+
+    # Only the duplicate SpatialData transform attribute was removed; other attrs survive
+    assert seg["scale0"]["image"].attrs.get("custom_source_attr") == "preserved"
+
+    # Source image unchanged
+    assert list(sdata2.images["stitched_image"]["scale0"]["image"].coords["c"].values) == [
+        "DNA",
+        "Membrane",
+        "PanCK",
+    ]
 
 
 def test_merge_channels_single_channel_noop():
