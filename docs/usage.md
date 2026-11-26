@@ -212,6 +212,29 @@ cellpose_channels: "DAPI combined_membrane"
 
 The original channels are retained and the combined channel is appended. `method` can be `max` (default) or `prod`.
 
+### Example: create a dedicated segmentation image
+
+Create a separate multiscale image with copied/merged channels and use it for Cellpose:
+
+```yaml
+spatialdata_steps:
+  - name: merge_channels
+    stage: before_image_segmentation
+    args:
+      image_key: stitched_image
+      output_image_key: segmentation_image
+      channel_groups:
+        nuclear: [DNA]
+        membrane: [Membrane, PanCK]
+      method: max
+
+cellpose_channels: "nuclear membrane"
+```
+
+The source image remains unchanged. The new `segmentation_image` is registered as the cell segmentation image and Cellpose/Stardist will patch it automatically. Single-source groups (e.g., `nuclear: [DNA]`) are copied exactly; multi-source groups use the selected merge method. The pyramid is regenerated from the merged full-resolution image with the source-derived scale factors and preserved transformations.
+
+To aggregate channel intensities over the original image instead of the segmentation image, provide `--aggregate_image_key stitched_image`.
+
 ### Example: filter Cellpose boundaries before transcript segmentation
 
 Remove small Cellpose cells before Proseg/Baysor/Comseg consumes the boundaries:
@@ -229,6 +252,33 @@ spatialdata_steps:
 ```
 
 `filter_cells` copies the complete source shapes element to the configured backup key before filtering. The backup is never used as a downstream prior unless explicitly configured elsewhere.
+
+## Cellpose version and argument forwarding
+
+The pipeline forwards the applicable Sopa CLI arguments directly and supports selecting either Cellpose 3 (default) or Cellpose 4:
+
+- `cellpose_version`: `3` or `4`. Defaults to `3`.
+- `cellpose_kwargs`: forwarded as `--method-kwargs` for both Cellpose segmentation and model download.
+- `clahe_kernel_size`: forwarded as `--clahe-kernel-size` for Cellpose segmentation.
+- `image_scale`: forwarded as `--scale` for image patchification.
+- `patch_overlap_microns`: forwarded as `--patch-overlap-microns` for transcript patchification.
+- `unassigned_value`: forwarded as `--unassigned-value` for transcript patchification when a prior is provided.
+- `aggregate_genes`: Boolean, defaults to `true`; forwarded as `--aggregate-genes` or `--no-aggregate-genes`.
+- `expand_radius_ratio`: forwarded as `--expand-radius-ratio` for aggregation.
+- `infer_presets`: optional Boolean for Proseg; when explicitly set it is forwarded as `--infer-presets` or `--no-infer-presets`.
+
+Use the `gpu` profile to select the pytorch/CUDA container image matching the chosen Cellpose version. For example:
+
+```bash
+nextflow run nf-core/sopa \
+  --input samplesheet.csv \
+  --outdir results \
+  -profile docker,gpu,cosmx_cellpose \
+  --cellpose_version 4
+```
+
+> [!WARNING]
+> Changing Cellpose version or segmentation arguments requires a fresh work directory. The `.sopa_cache` directory is reused in place and is not automatically invalidated when these parameters change. Re-run with a clean work directory (or a new `--outdir`) rather than `-resume`.
 
 ## Running the pipeline
 

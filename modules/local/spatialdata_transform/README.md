@@ -43,8 +43,15 @@ Operations must **not** read arbitrary pipeline-global parameters, invoke Nextfl
     - `gaussian`: `sigma` (number > 0).
     - `rolling_ball`: `radius` (integer >= 0).
     - `tophat`: `radius` (integer >= 0), optional `selem` (`disk` or `square`, default `disk`).
-- `merge_channels`: append a combined channel to an image using pixel-wise `max` or `prod`.
-  - args: `image_key` (string), `channels` (ordered list of strings), `output_channel` (string, default `combined_membrane`), `method` (`max` or `prod`, default `max`).
+- `merge_channels`: combine source channels into one or more output channels.
+  - Legacy append mode: append one combined channel to the source image.
+    - args: `image_key` (string), `channels` (ordered list of strings), `output_channel` (string, default `combined_membrane`), `method` (`max` or `prod`, default `max`).
+  - Segmentation-image mode: create a separate multiscale image and register it as the cell segmentation image.
+    - args: `image_key` (string), `output_image_key` (string), `channel_groups` (map of output-channel name to ordered list of source channels), `method` (`max` or `prod`, default `max`).
+    - Single-source groups are copied exactly; multi-source groups are merged with the selected method.
+    - The source image is left unchanged.
+    - The new image is generated from the merged full-resolution image, using the source image's scale factors and preserved transformations.
+    - The new image is registered in `sdata.attrs['cell_segmentation_image']`, so downstream Cellpose/Stardist patching uses it automatically.
 - `filter_cells`: filter shapes using declarative numeric predicates and keep an unfiltered backup.
   - args: `source` (string, default `cellpose_boundaries`), `backup_key` (string, default `cellpose_boundaries_unfiltered`), `filters` (list of predicate maps).
   - Each predicate map contains: `column` (string), optional `min` (number), optional `max` (number), optional `keep_nulls` (boolean).

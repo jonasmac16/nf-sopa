@@ -59,7 +59,9 @@ The `{sample}.explorer` directory can be used for visualization and quick analys
   - Reformatted samplesheet files used as input to the pipeline: `samplesheet.valid.csv`.
   - Parameters used by the pipeline run: `params.json`.
   - SpatialData transformation manifests (one per sample/stage): `spatialdata_steps/{sample}/{stage}.json`. These record the ordered operations, their arguments, affected element types, before/after SpatialData summaries, and relevant dependency versions.
-  - When `merge_channels` or `background_correction` are used, the published `sample.zarr` image element contains the modified/appended channels.
+  - When `merge_channels` is used in legacy append mode or `background_correction` is used, the published `sample.zarr` image element contains the modified/appended channels.
+  - When `merge_channels` is used with `output_image_key`, the published `sample.zarr` contains a new multiscale image (e.g., `segmentation_image`) registered as the cell segmentation image. The source image is left unchanged.
+  - When `aggregate_image_key` is provided, channel intensities are aggregated over the specified image instead of the cell segmentation image.
   - When `filter_cells` is used at `after_cellpose`, the published `sample.zarr` contains the filtered `cellpose_boundaries` shapes element and a complete `cellpose_boundaries_unfiltered` backup. The backup preserves the original geometries, indices, transformations, and metadata.
 
 </details>

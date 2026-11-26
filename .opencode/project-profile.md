@@ -29,6 +29,7 @@ Versioned resources that affect results and must be matched to the assay/species
 - **Visium HD:** Space Ranger reference transcriptome. Default is `refdata-gex-GRCh38-2020-A.tar.gz`; `spaceranger_probeset` is user-specified. Do not silently use the human default for mouse or other references.
 - **Sopa Python package:** currently 2.2.12 (per module `environment.yml` files).
 - **Python runtime:** 3.12 in module environments.
+- **Cellpose:** major version 3 (Cellpose 3.1.1.3) is the default; version 4 (Cellpose 4.2.1.1) can be selected with `--cellpose_version 4`. The `gpu` profile selects the matching pytorch/CUDA container image. Effective container images are recorded in `conf/modules.config` and `docs/UPSTREAM.md`.
 - **Segmentation models:** Cellpose/Stardist model names/types and priors are user-specified per predefined profile or CLI parameters.
 - **Spatial coordinates, micron-to-pixel transformations, image scales, and channel/transcript identifiers** must be preserved exactly; changing them changes biological interpretation.
 
@@ -37,7 +38,8 @@ Versioned resources that affect results and must be matched to the assay/species
 - **Orchestration:** Nextflow >=25.10.4; pipeline version 1.0.2.
 - **Execution:** container/Conda per process. Docker and Singularity are recommended by nf-core; Apptainer is supported via the `apptainer` profile. There is no project-specific Apptainer image or required container invocation.
 - **External inputs:** no DataLad inputs are part of this repository. User samplesheet paths point to local or mounted raw data; treat source data as immutable.
-- **Caching/resumption:** `-resume` depends on file contents, not just names.
+- **Caching/resumption:** `-resume` depends on file contents, not just names. Changing Cellpose version or segmentation arguments requires a fresh work directory because `.sopa_cache` is reused in place and not automatically invalidated.
+- **Provenance:** when Cellpose version matters, record the effective container/Conda environment identity; the selected image is version- and profile-dependent.
 
 ## Critical invariants
 

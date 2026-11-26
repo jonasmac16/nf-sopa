@@ -122,6 +122,8 @@ def extractSubArgs(Map args, String group) {
             expand_radius_ratio: args.expand_radius_ratio,
             min_transcripts: args.min_transcripts,
             min_intensity_ratio: args.min_intensity_ratio,
+            gene_column: args.technology == 'cosmx' ? 'target' : null,
+            image_key: args.aggregate_image_key,
         ]
     } else if (group == "tissue_segmentation") {
         return [
@@ -270,12 +272,14 @@ def getSpatialDataStepOperationMetadata() {
         ],
         merge_channels: [
             supported_stages: ['before_image_segmentation'],
-            required_args: ['image_key', 'channels'],
+            required_args: ['image_key'],
             arg_types: [
                 image_key: 'string',
                 channels: 'list',
                 output_channel: 'string',
                 method: 'string',
+                output_image_key: 'string',
+                channel_groups: 'map',
             ],
         ],
         filter_cells: [

@@ -1,0 +1,227 @@
+nextflow_function {
+
+    name "Test parameter validation helpers"
+    script "../modules/local/parameter_validation.nf"
+    tag "parameter_validation"
+
+    test("cellpose_version accepts integer 3") {
+
+        function "validateCellposeVersion"
+
+        when {
+            function {
+                """
+                input[0] = 3
+                """
+            }
+        }
+
+        then {
+            assert function.success
+        }
+    }
+
+    test("cellpose_version accepts integer 4") {
+
+        function "validateCellposeVersion"
+
+        when {
+            function {
+                """
+                input[0] = 4
+                """
+            }
+        }
+
+        then {
+            assert function.success
+        }
+    }
+
+    test("cellpose_version accepts string '3'") {
+
+        function "validateCellposeVersion"
+
+        when {
+            function {
+                """
+                input[0] = '3'
+                """
+            }
+        }
+
+        then {
+            assert function.success
+        }
+    }
+
+    test("cellpose_version accepts string '4'") {
+
+        function "validateCellposeVersion"
+
+        when {
+            function {
+                """
+                input[0] = '4'
+                """
+            }
+        }
+
+        then {
+            assert function.success
+        }
+    }
+
+    test("cellpose_version rejects unsupported values") {
+
+        function "validateCellposeVersion"
+
+        when {
+            function {
+                """
+                input[0] = 5
+                """
+            }
+        }
+
+        then {
+            assert function.failed
+        }
+    }
+
+    test("validateBoolean rejects non-boolean") {
+
+        function "validateBoolean"
+
+        when {
+            function {
+                """
+                input[0] = 'aggregate_genes'
+                input[1] = 'true'
+                """
+            }
+        }
+
+        then {
+            assert function.failed
+        }
+    }
+
+    test("validateNonNegativeNumber rejects negative") {
+
+        function "validateNonNegativeNumber"
+
+        when {
+            function {
+                """
+                input[0] = 'patch_overlap_microns'
+                input[1] = -1
+                """
+            }
+        }
+
+        then {
+            assert function.failed
+        }
+    }
+
+    test("validatePositiveNumber rejects zero") {
+
+        function "validatePositiveNumber"
+
+        when {
+            function {
+                """
+                input[0] = 'clahe_kernel_size'
+                input[1] = 0
+                """
+            }
+        }
+
+        then {
+            assert function.failed
+        }
+    }
+
+    test("validateNonBlankString rejects blank") {
+
+        function "validateNonBlankString"
+
+        when {
+            function {
+                """
+                input[0] = 'cellpose_kwargs'
+                input[1] = '   '
+                """
+            }
+        }
+
+        then {
+            assert function.failed
+        }
+    }
+
+    test("validateAggregation rejects both disabled") {
+
+        function "validateAggregation"
+
+        when {
+            function {
+                """
+                input[0] = false
+                input[1] = false
+                """
+            }
+        }
+
+        then {
+            assert function.failed
+        }
+    }
+
+    test("validateAggregation accepts genes-only") {
+
+        function "validateAggregation"
+
+        when {
+            function {
+                """
+                input[0] = true
+                input[1] = false
+                """
+            }
+        }
+
+        then {
+            assert function.success
+        }
+    }
+
+    test("validateParameters recognizes all new parameters without warnings") {
+
+        function "validateParameters"
+
+        when {
+            params {
+                cellpose_version = 4
+                aggregate_genes = true
+                aggregate_channels = true
+                infer_presets = true
+                patch_overlap_microns = 50
+                clahe_kernel_size = 64
+                expand_radius_ratio = 0.5
+                aggregate_image_key = 'stitched_image'
+                cellpose_kwargs = '{"do_3D": false}'
+                unassigned_value = 'UNASSIGNED'
+            }
+            function {
+                """
+                """
+            }
+        }
+
+        then {
+            assert function.success
+        }
+    }
+}

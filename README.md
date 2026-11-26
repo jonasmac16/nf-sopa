@@ -69,6 +69,8 @@ nextflow run nf-core/sopa \
    --outdir <OUTDIR>
 ```
 
+Cellpose major version (3 or 4) is selected with `--cellpose_version`; the `gpu` profile selects the matching pytorch/CUDA image. Changing Cellpose version or segmentation arguments requires a fresh work directory because the in-place `.sopa_cache` is not automatically invalidated.
+
 > [!WARNING]
 > Please provide pipeline parameters via the CLI or Nextflow `-params-file` option. Custom config files including those provided by the `-c` Nextflow option can be used to provide any configuration _**except for parameters**_; see [docs](https://nf-co.re/docs/running/run-pipelines#using-parameter-files).
 

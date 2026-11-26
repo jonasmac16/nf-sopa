@@ -14,6 +14,47 @@ Use entries like:
 
 **Evidence/links:** Optional references to issues, papers, dataset revisions, or commands.
 
+## 2026-11-26: Complete nf-core/sopa argument forwarding
+
+**Decision:** Expose the nine applicable arguments from the pinned nf-core/sopa 1.0.2 interface (`cellpose_version`, `cellpose_kwargs`, `clahe_kernel_size`, `image_scale`, `patch_overlap_microns`, `unassigned_value`, `aggregate_genes`, `expand_radius_ratio`, `infer_presets`) and forward them directly through the existing local adapters.
+
+**Rationale:**
+
+- Direct forwarding keeps the local wrapper aligned with upstream Sopa CLI semantics without duplicating defaults or interpretation logic.
+- `cellpose_version` controls container/environment selection only; it is not passed as a CLI flag.
+- `aggregate_genes` defaults to `true` so existing profiles that only set `aggregate_channels` continue to produce a transcript-count table.
+- CosMx aggregation requires `--gene-column target`; the adapter injects this automatically for `technology == 'cosmx'`.
+- Proseg requires a single transcript patch, so `patch_width_microns` remains forced to `-1` for `use_proseg`.
+
+**Consequences:**
+
+- `modules/local/utils.nf` maps these parameters to their Sopa CLI flag names.
+- `modules/local/parameter_validation.nf` enforces cross-parameter constraints (e.g., at least one aggregation mode enabled, valid Cellpose version, Boolean/numeric/string checks).
+- `conf/modules.config` selects the pinned Cellpose 3 or Cellpose 4 CPU/GPU container for `DOWNLOAD_CELLPOSE_MODEL`, `PATCH_SEGMENTATION_CELLPOSE`, and `RESOLVE_CELLPOSE`.
+- Tests in `tests/sopa_args.nf.test`, `tests/parameter_validation.nf.test`, and `tests/cellpose_container_*.nf.test` cover the mappings, validation, and container selection.
+
+**Evidence/links:** Implementation in `modules/local/utils.nf`, `modules/local/parameter_validation.nf`, `conf/modules.config`, and `nextflow.config`.
+
+## 2026-11-26: Dedicated segmentation image via `merge_channels`
+
+**Decision:** Extend `merge_channels` so it can create a separate multiscale segmentation image with configured channel groups, leaving the source image unchanged.
+
+**Rationale:**
+
+- Some technologies (e.g., CosMx) provide a stitched source image with many channels, but Cellpose only needs a nuclear and a membrane channel. Creating a dedicated segmentation image avoids modifying or duplicating the full source image while giving Cellpose exactly the channels it expects.
+- Single-source channel groups should be copied exactly; multi-source groups use the selected merge method (`max` or `prod`).
+- Regenerating the pyramid from the merged full-resolution image guarantees that all scales are consistent with each other and with the source coordinate transformations, rather than merging each scale independently.
+- Registering the new image under `sdata.attrs['cell_segmentation_image']` makes it transparently available to Sopa's patchification and segmentation CLI without adding new pipeline parameters for image selection.
+
+**Consequences:**
+
+- `merge_channels` now supports two modes: legacy append-to-source (`channels`/`output_channel`) and segmentation-image mode (`output_image_key`/`channel_groups`).
+- In segmentation-image mode, `sdata.attrs['cell_segmentation_image']` is updated to `output_image_key`.
+- The new `aggregate_image_key` pipeline parameter forwards `--image-key` to `sopa aggregate`, allowing aggregation over the original image while segmentation uses the new image.
+- Tests in `modules/local/spatialdata_transform/tests/test_operations.py` verify source-image preservation, exact single-channel copying, multi-channel merging, pyramid regeneration, and the cell-segmentation attribute.
+
+**Evidence/links:** Implementation in `modules/local/spatialdata_transform/operations.py`; Sopa image resolution via `sopa.utils.get_spatial_image` and `SopaAttrs.CELL_SEGMENTATION`.
+
 ## 2026-11-25: Specific SpatialData transformation operations
 
 **Decision:** Implement three concrete operations through the generic Part 1 framework:

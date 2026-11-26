@@ -1,0 +1,340 @@
+nextflow_function {
+
+    name "Test Sopa CLI argument helpers"
+    script "../modules/local/utils.nf"
+    tag "sopa_args"
+
+    test("aggregate emits default --aggregate-genes") {
+
+        function "argsCLI"
+
+        when {
+            params {
+                technology = 'xenium'
+                aggregate_genes = true
+                aggregate_channels = true
+                expand_radius_ratio = null
+                min_transcripts = null
+                min_intensity_ratio = null
+            }
+            function {
+                """
+                input[0] = 'aggregate'
+                """
+            }
+        }
+
+        then {
+            assert function.success
+            def result = function.result.toString()
+            assert result.contains('--aggregate-genes')
+            assert result.contains('--aggregate-channels')
+            assert !result.contains('--no-aggregate-genes')
+            assert !result.contains('--expand-radius-ratio')
+            assert !result.contains('--gene-column')
+        }
+    }
+
+    test("aggregate emits --no-aggregate-genes when disabled") {
+
+        function "argsCLI"
+
+        when {
+            params {
+                technology = 'xenium'
+                aggregate_genes = false
+                aggregate_channels = true
+                expand_radius_ratio = null
+                min_transcripts = null
+                min_intensity_ratio = null
+            }
+            function {
+                """
+                input[0] = 'aggregate'
+                """
+            }
+        }
+
+        then {
+            assert function.success
+            def result = function.result.toString()
+            assert result.contains('--no-aggregate-genes')
+            assert !result.contains('--aggregate-genes --')
+        }
+    }
+
+    test("aggregate emits CosMx-specific --gene-column target") {
+
+        function "argsCLI"
+
+        when {
+            params {
+                technology = 'cosmx'
+                aggregate_genes = true
+                aggregate_channels = true
+                expand_radius_ratio = null
+                min_transcripts = null
+                min_intensity_ratio = null
+            }
+            function {
+                """
+                input[0] = 'aggregate'
+                """
+            }
+        }
+
+        then {
+            assert function.success
+            def result = function.result.toString()
+            assert result.contains("--gene-column 'target'")
+        }
+    }
+
+    test("aggregate forwards --image-key") {
+
+        function "argsCLI"
+
+        when {
+            params {
+                technology = 'xenium'
+                aggregate_genes = true
+                aggregate_channels = true
+                expand_radius_ratio = null
+                min_transcripts = null
+                min_intensity_ratio = null
+                aggregate_image_key = 'stitched_image'
+            }
+            function {
+                """
+                input[0] = 'aggregate'
+                """
+            }
+        }
+
+        then {
+            assert function.success
+            def result = function.result.toString()
+            assert result.contains("--image-key 'stitched_image'")
+        }
+    }
+
+    test("aggregate forwards --expand-radius-ratio") {
+
+        function "argsCLI"
+
+        when {
+            params {
+                technology = 'xenium'
+                aggregate_genes = true
+                aggregate_channels = true
+                expand_radius_ratio = 0.5
+                min_transcripts = null
+                min_intensity_ratio = null
+            }
+            function {
+                """
+                input[0] = 'aggregate'
+                """
+            }
+        }
+
+        then {
+            assert function.success
+            def result = function.result.toString()
+            assert result.contains('--expand-radius-ratio 0.5')
+        }
+    }
+
+    test("image patches forwards --scale") {
+
+        function "argsCLI"
+
+        when {
+            params {
+                patch_width_pixel = 6000
+                patch_overlap_pixel = 150
+                image_scale = 'scale1'
+            }
+            function {
+                """
+                input[0] = 'image_patches'
+                """
+            }
+        }
+
+        then {
+            assert function.success
+            def result = function.result.toString()
+            assert result.contains('--patch-width-pixel 6000')
+            assert result.contains('--patch-overlap-pixel 150')
+            assert result.contains("--scale 'scale1'")
+        }
+    }
+
+    test("transcript patches keep --patch-width-microns -1 and forward overlap/unassigned") {
+
+        function "argsCLI"
+
+        when {
+            params {
+                use_proseg = true
+                patch_width_microns = null
+                patch_overlap_microns = 50
+                prior_shapes_key = null
+                unassigned_value = 'UNASSIGNED'
+            }
+            function {
+                """
+                input[0] = 'transcript_patches'
+                """
+            }
+        }
+
+        then {
+            assert function.success
+            def result = function.result.toString()
+            assert result.contains('--patch-width-microns -1')
+            assert result.contains('--patch-overlap-microns 50')
+            assert result.contains("--unassigned-value 'UNASSIGNED'")
+            assert !result.contains('--prior-shapes-key')
+        }
+    }
+
+    test("cellpose forwards --clahe-kernel-size and --method-kwargs") {
+
+        function "argsCLI"
+
+        when {
+            params {
+                cellpose_diameter = 60
+                cellpose_channels = 'DAPI'
+                flow_threshold = 2
+                cellprob_threshold = null
+                cellpose_model_type = 'cyto3'
+                pretrained_model = null
+                min_area_pixels2 = 0
+                clip_limit = null
+                clahe_kernel_size = 64
+                gaussian_sigma = null
+                cellpose_kwargs = '{"do_3D": false}'
+            }
+            function {
+                """
+                input[0] = 'cellpose'
+                """
+            }
+        }
+
+        then {
+            assert function.success
+            def result = function.result.toString()
+            assert result.contains('--diameter 60')
+            assert result.contains("--channels 'DAPI'")
+            assert result.contains('--flow-threshold 2')
+            assert result.contains("--model-type 'cyto3'")
+            assert result.contains('--clahe-kernel-size 64')
+            assert result.contains('--method-kwargs')
+            assert !result.contains('--cellprob-threshold')
+        }
+    }
+
+    test("download cellpose forwards --method-kwargs") {
+
+        function "argsCLI"
+
+        when {
+            params {
+                cellpose_model_type = 'cyto3'
+                pretrained_model = null
+                cellpose_kwargs = '{"nchan": 2}'
+            }
+            function {
+                """
+                input[0] = 'download_cellpose'
+                """
+            }
+        }
+
+        then {
+            assert function.success
+            def result = function.result.toString()
+            assert result.contains("--model-type 'cyto3'")
+            assert result.contains('--method-kwargs')
+            assert result.contains('nchan')
+        }
+    }
+
+    test("proseg emits --infer-presets when true") {
+
+        function "argsCLI"
+
+        when {
+            params {
+                command_line_suffix = ''
+                infer_presets = true
+                visium_hd_prior_shapes_key = null
+            }
+            function {
+                """
+                input[0] = 'proseg'
+                """
+            }
+        }
+
+        then {
+            assert function.success
+            def result = function.result.toString()
+            assert result.contains('--infer-presets')
+            assert !result.contains('--no-infer-presets')
+        }
+    }
+
+    test("proseg emits --no-infer-presets when explicitly false") {
+
+        function "argsCLI"
+
+        when {
+            params {
+                command_line_suffix = ''
+                infer_presets = false
+                visium_hd_prior_shapes_key = null
+            }
+            function {
+                """
+                input[0] = 'proseg'
+                """
+            }
+        }
+
+        then {
+            assert function.success
+            def result = function.result.toString()
+            assert result.contains('--no-infer-presets')
+            assert !result.contains('--infer-presets --')
+        }
+    }
+
+    test("proseg omits infer-presets when null") {
+
+        function "argsCLI"
+
+        when {
+            params {
+                command_line_suffix = ''
+                infer_presets = null
+                visium_hd_prior_shapes_key = null
+            }
+            function {
+                """
+                input[0] = 'proseg'
+                """
+            }
+        }
+
+        then {
+            assert function.success
+            def result = function.result.toString()
+            assert !result.contains('infer-presets')
+        }
+    }
+}

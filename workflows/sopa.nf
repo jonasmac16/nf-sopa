@@ -28,6 +28,7 @@ include { BAYSOR                  } from '../subworkflows/local/baysor'
 
 include { argsCLI                       } from '../modules/local/utils'
 include { extractOutsDir                  } from '../modules/local/utils'
+include { validateParameters              } from '../modules/local/parameter_validation'
 include { SPATIALDATA_TRANSFORM_STAGE as SPATIALDATA_TRANSFORM_AFTER_CONVERSION;
           SPATIALDATA_TRANSFORM_STAGE as SPATIALDATA_TRANSFORM_BEFORE_IMAGE_SEGMENTATION;
           SPATIALDATA_TRANSFORM_STAGE as SPATIALDATA_TRANSFORM_AFTER_CELLPOSE;
@@ -68,6 +69,8 @@ workflow SOPA {
     outdir
 
     main:
+
+    validateParameters()
 
     def ch_versions = channel.empty()
 
